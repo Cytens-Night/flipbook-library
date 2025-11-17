@@ -19,10 +19,10 @@ RUN wget -O en_US-lessac-medium.onnx https://huggingface.co/rhasspy/piper-voices
 # Install Node.js for Express server
 RUN apt-get update && apt-get install -y nodejs npm
 
-# Copy server files
-COPY package*.json ./
+# Copy server files (source paths adjusted for root build context on Railway)
+COPY tts-server/package*.json ./
 RUN npm install
-COPY server-docker.js ./server.js
+COPY tts-server/server-docker.js ./server.js
 
 EXPOSE 3001
 
