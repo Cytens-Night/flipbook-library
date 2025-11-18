@@ -55,6 +55,9 @@ async function parsePDF(file, bookData) {
   const numPages = pdf.numPages;
   const pages = [];
   
+  // Store raw PDF data for re-rendering
+  const pdfDataArray = new Uint8Array(arrayBuffer);
+  
   // Extract cover image from first page
   let coverImage = null;
   try {
@@ -75,29 +78,16 @@ async function parsePDF(file, bookData) {
     console.error('Failed to extract PDF cover:', e);
   }
 
+  // Extract text from each page (for TTS and search)
   for (let i = 1; i <= numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
     const text = textContent.items.map(item => item.str).join(' ');
     
-    // Also render as canvas for visual representation
-    const viewport = page.getViewport({ scale: 1.5 });
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    
-    await page.render({
-      canvasContext: context,
-      viewport: viewport,
-    }).promise;
-    
-    const imageData = canvas.toDataURL('image/png');
-    
     pages.push({
       text,
-      image: imageData,
       pageNumber: i,
+      type: 'pdf'
     });
   }
 
@@ -107,6 +97,7 @@ async function parsePDF(file, bookData) {
     pages,
     totalPages: numPages,
     coverImage: coverImage || bookData.coverImage,
+    pdfData: Array.from(pdfDataArray) // Store as regular array for serialization
   };
 }
 

@@ -20,6 +20,7 @@ import {
 import { useSettingsStore, useLibraryStore } from '../../store/useStore';
 import { ttsService } from '../../utils/ttsService';
 import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
+import PDFPageRenderer from './PDFPageRenderer';
 
 const ReadingViewContainer = styled.div`
   display: flex;
@@ -141,6 +142,7 @@ const FlipbookContainer = styled.div`
 `;
 
 const Page = styled.div`
+  position: relative;
   background: ${props => props.$bgColor || '#FFFFFF'};
   color: ${props => props.$textColor || '#000000'};
   padding: ${props => props.theme.spacing.lg};
@@ -150,6 +152,35 @@ const Page = styled.div`
   font-size: ${props => props.$fontSize || '16px'};
   line-height: ${props => props.$lineHeight || '1.6'};
   user-select: text;
+`;
+
+const PageContent = styled.div`
+  position: relative;
+  width: 100%;
+  height: 100%;
+`;
+
+const PageBookmarkButton = styled.button`
+  position: absolute;
+  top: ${props => props.theme.spacing.sm};
+  right: ${props => props.theme.spacing.sm};
+  background: rgba(137, 180, 250, 0.9);
+  border: none;
+  color: ${props => props.theme.colors.background};
+  padding: ${props => props.theme.spacing.sm};
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  &:hover {
+    background: rgba(137, 180, 250, 1);
+    transform: scale(1.1);
+  }
 `;
 
 const PageImage = styled.img`
@@ -392,6 +423,12 @@ const ReadingView = ({ book, onClose, onBookmark, onAddQuote }) => {
       onBookmark(currentPage + 1);
     }
   };
+
+  const handlePageBookmark = (pageNum) => {
+    if (onBookmark) {
+      onBookmark(pageNum);
+    }
+  };
   
   // Keyboard shortcuts
   useKeyboardShortcuts({
@@ -624,23 +661,62 @@ const ReadingView = ({ book, onClose, onBookmark, onAddQuote }) => {
           onFlip={onFlip}
           className="flipbook"
         >
-          {book.pages.map((page, index) => (
-            <Page
-              key={index}
-              $bgColor={settings.backgroundColor}
-              $textColor={settings.textColor}
-              $fontFamily={settings.fontFamily}
-              $fontSize={settings.fontSize}
-              $lineHeight={settings.lineHeight}
-              onMouseUp={handleTextSelection}
-            >
-              {page.image ? (
-                <PageImage src={page.image} alt={`Page ${index + 1}`} />
-              ) : (
-                <div>{page.text || ''}</div>
-              )}
-            </Page>
-          ))}
+          {book.pages.map((page, index) => {
+            const pageNum = index + 1;
+            const isPageBookmarked = bookmarks.includes(pageNum);
+            
+            return (
+              <Page
+                key={index}
+                $bgColor={settings.backgroundColor}
+                $textColor={settings.textColor}
+                $fontFamily={settings.fontFamily}
+                $fontSize={settings.fontSize}
+                $lineHeight={settings.lineHeight}
+                onMouseUp={handleTextSelection}
+              >
+                {book.format === 'pdf' && book.pdfData ? (
+                  <PDFPageRenderer
+                    pdfData={new Uint8Array(book.pdfData)}
+                    pageNumber={pageNum}
+                    scale={1.5}
+                    isBookmarked={isPageBookmarked}
+                    onBookmarkToggle={handlePageBookmark}
+                    onTextSelect={(text) => {
+                      setSelectedText(text);
+                      const selection = window.getSelection();
+                      if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        setSelectionPosition({
+                          top: rect.top + window.scrollY - 50,
+                          left: rect.left + window.scrollX,
+                        });
+                      }
+                    }}
+                    bgColor={settings.backgroundColor}
+                  />
+                ) : (
+                  <PageContent>
+                    <PageBookmarkButton 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePageBookmark(pageNum);
+                      }}
+                      title={isPageBookmarked ? "Remove Bookmark" : "Add Bookmark"}
+                    >
+                      {isPageBookmarked ? <BookmarkCheck size={20} fill="currentColor" /> : <Bookmark size={20} />}
+                    </PageBookmarkButton>
+                    {page.image ? (
+                      <PageImage src={page.image} alt={`Page ${pageNum}`} />
+                    ) : (
+                      <div>{page.text || ''}</div>
+                    )}
+                  </PageContent>
+                )}
+              </Page>
+            );
+          })}
         </HTMLFlipBook>
       </FlipbookContainer>
 
