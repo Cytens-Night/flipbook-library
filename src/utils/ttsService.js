@@ -119,11 +119,64 @@ export const ttsService = {
 
     const { voice = 'default', rate = 1.0, pitch = 1.0, onEnd, onBoundary } = options;
     
+    // Map our voice names to browser preferences
+    const getVoicePreference = (voiceName) => {
+      if (voiceName === 'danny') {
+        // Prefer male voices (David, Alex, James, etc.)
+        return (v) => {
+          const name = v.name.toLowerCase();
+          const uri = v.voiceURI.toLowerCase();
+          return (
+            name.includes('male') ||
+            name.includes('david') ||
+            name.includes('alex') ||
+            name.includes('james') ||
+            name.includes('daniel') ||
+            name.includes('mark') ||
+            uri.includes('male')
+          ) && v.lang.startsWith('en');
+        };
+      } else if (voiceName === 'lessac') {
+        // Prefer female voices (Samantha, Victoria, Karen, etc.)
+        return (v) => {
+          const name = v.name.toLowerCase();
+          const uri = v.voiceURI.toLowerCase();
+          return (
+            name.includes('female') ||
+            name.includes('samantha') ||
+            name.includes('victoria') ||
+            name.includes('karen') ||
+            name.includes('susan') ||
+            name.includes('zira') ||
+            uri.includes('female')
+          ) && v.lang.startsWith('en');
+        };
+      }
+      // Default: any English voice
+      return (v) => v.lang.startsWith('en');
+    };
+    
+    // Ensure voices are loaded
+    const loadVoices = () => {
+      return new Promise((resolve) => {
+        let voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          resolve(voices);
+        } else {
+          window.speechSynthesis.onvoiceschanged = () => {
+            voices = window.speechSynthesis.getVoices();
+            resolve(voices);
+          };
+        }
+      });
+    };
+    
     // Split into smaller chunks for immediate playback
     const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
     let currentIndex = 0;
+    let selectedVoice = null;
     
-    const speakNext = () => {
+    const speakNext = async () => {
       if (currentIndex >= sentences.length) {
         if (onEnd) onEnd();
         return;
@@ -136,14 +189,21 @@ export const ttsService = {
         return;
       }
       
+      // Load voice on first sentence
+      if (!selectedVoice) {
+        const voices = await loadVoices();
+        const voiceFilter = getVoicePreference(voice);
+        selectedVoice = voices.find(voiceFilter) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+        console.log('Using voice:', selectedVoice?.name || 'default');
+      }
+      
       const utterance = new SpeechSynthesisUtterance(sentence);
       utterance.rate = rate;
       utterance.pitch = pitch;
       
-      // Try to match voice
-      const voices = window.speechSynthesis.getVoices();
-      const selectedVoice = voices.find(v => v.voiceURI === voice || v.name.includes(voice));
-      if (selectedVoice) utterance.voice = selectedVoice;
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
       
       utterance.onend = () => {
         currentIndex++;
