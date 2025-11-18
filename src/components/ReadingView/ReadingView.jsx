@@ -110,6 +110,27 @@ const FontSizeButton = styled.button`
   }
 `;
 
+const VoiceSelector = styled.select`
+  background: ${props => props.theme.colors.surface};
+  border: 1px solid ${props => props.theme.colors.border};
+  color: ${props => props.theme.colors.text};
+  padding: 0.35rem 0.65rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  
+  &:hover {
+    border-color: ${props => props.theme.colors.accent};
+  }
+  
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.colors.accent};
+    box-shadow: 0 0 0 2px ${props => props.theme.colors.accentGlow};
+  }
+`;
+
 const FlipbookContainer = styled.div`
   flex: 1;
   display: flex;
@@ -313,6 +334,7 @@ const ReadingView = ({ book, onClose, onBookmark, onAddQuote }) => {
   
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentAudio, setCurrentAudio] = useState(null);
+  const [selectedVoice, setSelectedVoice] = useState('danny');
 
   // Get current book data from store
   const currentBookData = books.find(b => b.id === book?.id);
@@ -405,7 +427,7 @@ const ReadingView = ({ book, onClose, onBookmark, onAddQuote }) => {
       
       setIsSpeaking(true);
       const audio = await ttsService.speak(pageText, {
-        voice: settingsStore.ttsVoice || 'default',
+        voice: selectedVoice,
         rate: settingsStore.ttsRate || 1.0,
         pitch: settingsStore.ttsPitch || 1.0,
         onEnd: () => setIsSpeaking(false)
@@ -478,6 +500,14 @@ const ReadingView = ({ book, onClose, onBookmark, onAddQuote }) => {
           >
             {nightMode ? <Sun size={20} /> : <Moon size={20} />}
           </IconButton>
+          <VoiceSelector 
+            value={selectedVoice} 
+            onChange={(e) => setSelectedVoice(e.target.value)}
+            title="Select TTS Voice"
+          >
+            <option value="danny">🎙️ Danny (Male)</option>
+            <option value="lessac">🎙️ Lessac (Female)</option>
+          </VoiceSelector>
         </ReadingControls>
         <ControlButtons>
           <IconButton 
