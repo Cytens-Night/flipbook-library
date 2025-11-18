@@ -383,10 +383,45 @@ const ReadingView = ({ book, onClose, onBookmark, onAddQuote }) => {
         top: rect.top + window.scrollY - 50,
         left: rect.left + window.scrollX + (rect.width / 2) - 75
       });
+      
+      // If TTS is playing, interrupt and start from selected text
+      if (isSpeaking) {
+        handleReadFromSelection(text);
+      }
     } else {
       setSelectedText('');
       setSelectionPosition(null);
     }
+  };
+  
+  const handleReadFromSelection = async (selectedText) => {
+    // Stop current reading
+    ttsService.stop();
+    if (currentAudio && currentAudio.pause) {
+      currentAudio.pause();
+    }
+    
+    // Get full page text
+    let pageText = '';
+    if (book.content) {
+      pageText = book.content;
+    } else if (book.pages && book.pages[currentPage]) {
+      const page = book.pages[currentPage];
+      pageText = page.text || '';
+    }
+    
+    if (!pageText) return;
+    
+    // Start reading from selected position
+    const audio = await ttsService.speakFromSelection(pageText, selectedText, {
+      voice: selectedVoice,
+      rate: settingsStore.ttsRate || 1.0,
+      pitch: settingsStore.ttsPitch || 1.0,
+      onEnd: () => setIsSpeaking(false)
+    });
+    
+    setCurrentAudio(audio);
+    setIsSpeaking(true);
   };
 
   const handleAddQuote = () => {
@@ -578,15 +613,32 @@ const ReadingView = ({ book, onClose, onBookmark, onAddQuote }) => {
 
       {/* Highlight/Quote Button */}
       {selectionPosition && (
-        <HighlightButton
-          className="highlight-button"
-          $show={!!selectedText}
-          style={{ top: `${selectionPosition.top}px`, left: `${selectionPosition.left}px` }}
-          onClick={handleAddQuote}
-        >
-          <Quote size={16} />
-          Save Quote
-        </HighlightButton>
+        <div style={{ 
+          position: 'absolute', 
+          top: `${selectionPosition.top}px`, 
+          left: `${selectionPosition.left - 75}px`,
+          display: 'flex',
+          gap: '8px',
+          zIndex: 1000
+        }}>
+          <HighlightButton
+            className="highlight-button"
+            $show={!!selectedText}
+            onClick={handleAddQuote}
+          >
+            <Quote size={16} />
+            Save Quote
+          </HighlightButton>
+          <HighlightButton
+            className="highlight-button"
+            $show={!!selectedText}
+            onClick={() => handleReadFromSelection(selectedText)}
+            style={{ background: '#F38BA8' }}
+          >
+            <Volume2 size={16} />
+            Read from here
+          </HighlightButton>
+        </div>
       )}
 
       {/* Quotes Panel */}

@@ -4,6 +4,8 @@
 export const ttsService = {
   baseURL: 'https://flipbook-library-production.up.railway.app/api',
   piperAvailable: false,
+  currentUtterance: null,
+  currentAudio: null,
   
   // Check if Piper TTS server is running
   async checkPiper() {
@@ -42,6 +44,11 @@ export const ttsService = {
   async speak(text, options = {}) {
     const { voice = 'danny', rate = 1.0, pitch = 1.0, onEnd } = options;
     
+    // For immediate feedback, use browser native with sentence chunking
+    // This starts speaking instantly while Piper would take 2-3 seconds
+    return this.speakNative(text, { voice, rate, pitch, onEnd });
+    
+    /* Piper code kept for reference - can be enabled for higher quality
     // Support longer text for novel reading - increase to 30000 chars (~6k words per request)
     const maxLength = 30000;
     let processedText = text.trim();
@@ -86,6 +93,7 @@ export const ttsService = {
           const audioBlob = await response.blob();
           const audio = new Audio(URL.createObjectURL(audioBlob));
           audio.onended = onEnd;
+          this.currentAudio = audio;
           await audio.play();
           return audio;
         } else {
@@ -100,6 +108,7 @@ export const ttsService = {
     
     // Fallback to browser native TTS
     return this.speakNative(text, { voice, rate, pitch, onEnd });
+    */
   },
 
   speakNative(text, options = {}) {
@@ -108,26 +117,77 @@ export const ttsService = {
       return null;
     }
 
-    const { voice = 'default', rate = 1.0, pitch = 1.0, onEnd } = options;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = rate;
-    utterance.pitch = pitch;
+    const { voice = 'default', rate = 1.0, pitch = 1.0, onEnd, onBoundary } = options;
     
-    // Try to match voice
-    const voices = window.speechSynthesis.getVoices();
-    const selectedVoice = voices.find(v => v.voiceURI === voice || v.name.includes(voice));
-    if (selectedVoice) utterance.voice = selectedVoice;
+    // Split into smaller chunks for immediate playback
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+    let currentIndex = 0;
     
-    utterance.onend = onEnd;
+    const speakNext = () => {
+      if (currentIndex >= sentences.length) {
+        if (onEnd) onEnd();
+        return;
+      }
+      
+      const sentence = sentences[currentIndex].trim();
+      if (!sentence) {
+        currentIndex++;
+        speakNext();
+        return;
+      }
+      
+      const utterance = new SpeechSynthesisUtterance(sentence);
+      utterance.rate = rate;
+      utterance.pitch = pitch;
+      
+      // Try to match voice
+      const voices = window.speechSynthesis.getVoices();
+      const selectedVoice = voices.find(v => v.voiceURI === voice || v.name.includes(voice));
+      if (selectedVoice) utterance.voice = selectedVoice;
+      
+      utterance.onend = () => {
+        currentIndex++;
+        speakNext();
+      };
+      
+      utterance.onboundary = onBoundary;
+      
+      this.currentUtterance = utterance;
+      window.speechSynthesis.speak(utterance);
+    };
+    
+    // Start speaking immediately
     window.speechSynthesis.cancel(); // Stop any current speech
-    window.speechSynthesis.speak(utterance);
+    speakNext();
     
-    return utterance;
+    return { stop: () => window.speechSynthesis.cancel() };
   },
 
   stop() {
+    // Stop Piper audio if playing
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio = null;
+    }
+    
+    // Stop browser native TTS
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
+    
+    this.currentUtterance = null;
+  },
+  
+  // New method: Speak from selected text position
+  speakFromSelection(fullText, selectedText, options = {}) {
+    const startIndex = fullText.indexOf(selectedText);
+    if (startIndex === -1) {
+      // If exact match not found, just speak the full text
+      return this.speak(fullText, options);
+    }
+    
+    // Extract text from selection point onwards
+    const textFromSelection = fullText.substring(startIndex);
+    return this.speak(textFromSelection, options);
   }
 };
