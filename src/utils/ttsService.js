@@ -1,8 +1,8 @@
 // Lightweight TTS utility using browser native + Piper TTS
-// Piper: High-quality, free, open-source neural TTS that runs locally
+// Piper: High-quality, free, open-source neural TTS hosted on Railway
 // https://github.com/rhasspy/piper
 export const ttsService = {
-  baseURL: 'http://localhost:3001/api',
+  baseURL: 'https://flipbook-library-production.up.railway.app/api',
   piperAvailable: false,
   
   // Check if Piper TTS server is running
@@ -42,19 +42,39 @@ export const ttsService = {
   async speak(text, options = {}) {
     const { voice = 'default', rate = 1.0, pitch = 1.0, onEnd } = options;
     
-    // Check Piper availability first
+    // Limit text length on client side too (reasonable single-page limit)
+    const maxLength = 3000;
+    let processedText = text.trim();
+    
+    if (processedText.length > maxLength) {
+      console.warn(`Text too long (${processedText.length} chars), truncating to ${maxLength}`);
+      // Try to cut at sentence boundary
+      processedText = processedText.substring(0, maxLength);
+      const lastPeriod = processedText.lastIndexOf('.');
+      const lastQuestion = processedText.lastIndexOf('?');
+      const lastExclaim = processedText.lastIndexOf('!');
+      const cutPoint = Math.max(lastPeriod, lastQuestion, lastExclaim);
+      if (cutPoint > maxLength * 0.8) {
+        processedText = processedText.substring(0, cutPoint + 1);
+      }
+    }
+    
+    // Always try Piper first - check availability if not yet checked
     if (!this.piperAvailable) {
+      console.log('Checking Piper TTS availability...');
       await this.checkPiper();
     }
     
-    // Try Piper TTS if available
+    // Try Piper TTS
+    console.log('Piper available:', this.piperAvailable);
     if (this.piperAvailable) {
       try {
+        console.log('Requesting Piper TTS for text:', processedText.substring(0, 50) + '...');
         const response = await fetch(`${this.baseURL}/tts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            text, 
+            text: processedText, 
             voice: voice === 'default' ? 'en_US-lessac-medium' : voice,
             rate, 
             pitch 
@@ -62,14 +82,18 @@ export const ttsService = {
         });
 
         if (response.ok) {
+          console.log('Piper TTS response received, playing audio...');
           const audioBlob = await response.blob();
           const audio = new Audio(URL.createObjectURL(audioBlob));
           audio.onended = onEnd;
           await audio.play();
           return audio;
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.warn('Piper TTS request failed:', response.status, response.statusText, errorData);
         }
       } catch (error) {
-        console.warn('Piper TTS unavailable, falling back to browser:', error);
+        console.warn('Piper TTS error, falling back to browser:', error);
         this.piperAvailable = false;
       }
     }

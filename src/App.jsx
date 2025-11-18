@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styled, { ThemeProvider } from 'styled-components';
 import { GlobalStyles } from './styles/globalStyles';
 import { theme } from './styles/theme';
@@ -6,6 +6,7 @@ import ShelfView from './components/Shelf/ShelfView';
 import ReadingView from './components/ReadingView/ReadingView';
 import Toast from './components/Toast/Toast';
 import { useLibraryStore } from './store/useStore';
+import { ttsService } from './utils/ttsService';
 
 const AppContainer = styled.div`
   display: flex;
@@ -31,6 +32,18 @@ function App() {
   const [currentBook, setCurrentBook] = useState(null);
   const [toasts, setToasts] = useState([]);
   const { toggleBookmark, addQuote } = useLibraryStore();
+
+  // Initialize TTS service on app load
+  useEffect(() => {
+    ttsService.checkPiper().then(available => {
+      console.log('🎤 TTS Service initialized. Piper available:', available);
+      if (available) {
+        console.log('✨ Natural voice TTS ready!');
+      } else {
+        console.log('📢 Using browser native TTS fallback');
+      }
+    });
+  }, []);
 
   const showToast = (message, type = 'info', duration = 3000) => {
     const id = Date.now() + Math.random();

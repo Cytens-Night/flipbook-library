@@ -32,6 +32,14 @@ app.post('/api/tts', async (req, res) => {
       return res.status(400).json({ error: 'Text is required' });
     }
 
+    // Limit text length to prevent timeouts (max ~5000 chars for reasonable processing)
+    const maxLength = 5000;
+    const processedText = text.length > maxLength 
+      ? text.substring(0, maxLength) + '...' 
+      : text;
+
+    console.log(`[TTS] Processing ${processedText.length} characters`);
+
     // Use Piper TTS
     const tempFile = join(tmpdir(), `tts-${Date.now()}.wav`);
     const piper = spawn(PIPER_PATH, [
@@ -40,26 +48,35 @@ app.post('/api/tts', async (req, res) => {
       '--length_scale', String(1.0 / rate)
     ]);
 
-    piper.stdin.write(text);
+    let stderr = '';
+    
+    piper.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    piper.stdin.write(processedText);
     piper.stdin.end();
 
     piper.on('close', (code) => {
       if (code === 0 && existsSync(tempFile)) {
+        console.log(`[TTS] Success - generated ${tempFile}`);
         res.set('Content-Type', 'audio/wav');
         res.sendFile(tempFile, () => {
           try { unlinkSync(tempFile); } catch (e) { }
         });
       } else {
-        res.status(500).json({ error: 'TTS generation failed', code });
+        console.error(`[TTS] Failed with code ${code}:`, stderr);
+        res.status(500).json({ error: 'TTS generation failed', code, details: stderr });
       }
     });
 
     piper.on('error', (error) => {
+      console.error('[TTS] Piper spawn error:', error);
       res.status(500).json({ error: 'Piper execution failed', details: error.message });
     });
 
   } catch (error) {
-    console.error('TTS Error:', error);
+    console.error('[TTS] Error:', error);
     res.status(500).json({ error: 'TTS processing failed', details: error.message });
   }
 });
