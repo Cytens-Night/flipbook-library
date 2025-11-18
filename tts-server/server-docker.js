@@ -12,38 +12,46 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 const PIPER_PATH = '/app/piper/piper';
-const MODEL_PATH = '/app/en_US-lessac-medium.onnx';
+const VOICE_MODELS = {
+  'danny': '/app/en_US-danny-low.onnx',        // Softer male narrator (default)
+  'lessac': '/app/en_US-lessac-medium.onnx'    // Alternative female
+};
+const DEFAULT_VOICE = 'danny';
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     service: 'Piper TTS Server',
-    model: 'en_US-lessac-medium'
+    defaultVoice: DEFAULT_VOICE,
+    availableVoices: Object.keys(VOICE_MODELS)
   });
 });
 
 // TTS endpoint
 app.post('/api/tts', async (req, res) => {
   try {
-    const { text, rate = 1.0 } = req.body;
+    const { text, rate = 1.0, voice = DEFAULT_VOICE } = req.body;
 
     if (!text) {
       return res.status(400).json({ error: 'Text is required' });
     }
 
-    // Limit text length to prevent timeouts (max ~5000 chars for reasonable processing)
-    const maxLength = 5000;
+    // Select voice model
+    const modelPath = VOICE_MODELS[voice] || VOICE_MODELS[DEFAULT_VOICE];
+
+    // Support longer documents - increase limit to 50000 chars (~10k words)
+    const maxLength = 50000;
     const processedText = text.length > maxLength 
       ? text.substring(0, maxLength) + '...' 
       : text;
 
-    console.log(`[TTS] Processing ${processedText.length} characters`);
+    console.log(`[TTS] Processing ${processedText.length} characters with voice: ${voice}`);
 
     // Use Piper TTS
     const tempFile = join(tmpdir(), `tts-${Date.now()}.wav`);
     const piper = spawn(PIPER_PATH, [
-      '--model', MODEL_PATH,
+      '--model', modelPath,
       '--output_file', tempFile,
       '--length_scale', String(1.0 / rate)
     ]);

@@ -40,10 +40,10 @@ export const ttsService = {
   },
 
   async speak(text, options = {}) {
-    const { voice = 'default', rate = 1.0, pitch = 1.0, onEnd } = options;
+    const { voice = 'danny', rate = 1.0, pitch = 1.0, onEnd } = options;
     
-    // Limit text length on client side too (reasonable single-page limit)
-    const maxLength = 3000;
+    // Support longer text for novel reading - increase to 30000 chars (~6k words per request)
+    const maxLength = 30000;
     let processedText = text.trim();
     
     if (processedText.length > maxLength) {
@@ -75,7 +75,7 @@ export const ttsService = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             text: processedText, 
-            voice: voice === 'default' ? 'en_US-lessac-medium' : voice,
+            voice: voice === 'default' ? 'danny' : voice,
             rate, 
             pitch 
           })

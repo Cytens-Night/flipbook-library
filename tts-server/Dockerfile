@@ -12,8 +12,10 @@ RUN wget https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_l
     && tar -xzf piper_linux_x86_64.tar.gz \
     && rm piper_linux_x86_64.tar.gz
 
-# Download voice model
-RUN wget -O en_US-lessac-medium.onnx https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx \
+# Download voice models - Danny (softer male narrator) and Lessac (backup)
+RUN wget -O en_US-danny-low.onnx https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/danny/low/en_US-danny-low.onnx \
+    && wget -O en_US-danny-low.onnx.json https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/danny/low/en_US-danny-low.onnx.json \
+    && wget -O en_US-lessac-medium.onnx https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx \
     && wget -O en_US-lessac-medium.onnx.json https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json
 
 # Install Node.js for Express server
