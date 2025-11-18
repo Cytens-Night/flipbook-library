@@ -32,16 +32,22 @@ const TextLayer = styled.div`
   width: 100%;
   height: 100%;
   overflow: hidden;
-  opacity: 0.2;
   line-height: 1;
   user-select: text;
   cursor: text;
+  z-index: 5;
   
   & > span {
     position: absolute;
     white-space: pre;
     color: transparent;
     cursor: text;
+    user-select: text;
+    
+    &::selection {
+      background: rgba(137, 180, 250, 0.3);
+      color: transparent;
+    }
   }
 `;
 
@@ -59,7 +65,7 @@ const BookmarkButton = styled.button`
   align-items: center;
   justify-content: center;
   transition: all 0.3s ease;
-  z-index: 10;
+  z-index: 20;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 
   &:hover {
